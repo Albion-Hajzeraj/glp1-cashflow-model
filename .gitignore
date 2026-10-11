@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+output/*
+!output/.gitkeep
+!output/omzo_model.xlsx
+!output/charts/
+!output/dashboard.pdf
+!output/retention_report.pdf

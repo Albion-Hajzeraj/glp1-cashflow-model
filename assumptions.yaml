@@ -1,0 +1,184 @@
+# =============================================================================
+# assumptions.yaml — every input to the synthetic GLP-1 telehealth model.
+# All figures are hypothetical. Currency: USD. Rates are decimals (0.05 = 5%).
+# "Month" lists always have 9 values in order Jan..Sep 2026.
+# =============================================================================
+
+period:
+  start: "2026-01"            # first modeled month
+  end: "2026-09"              # last modeled month (inclusive)
+  months: [2026-01, 2026-02, 2026-03, 2026-04, 2026-05, 2026-06, 2026-07, 2026-08, 2026-09]
+  random_seed: 42             # seed for synthetic data generation (reproducibility)
+
+# -----------------------------------------------------------------------------
+# Plans & pricing
+# -----------------------------------------------------------------------------
+plans:
+  monthly:
+    price: 349.00             # charged every 4 weeks (modeled as monthly)
+    term_months: 1            # months of service covered by one charge
+    mix: 0.70                 # share of new customers choosing this plan
+  prepaid_3m:
+    price: 897.00             # charged up front for 3 months ($299/mo effective)
+    term_months: 3            # months covered; revenue recognized ratably (1/3 per month)
+    mix: 0.30                 # share of new customers choosing this plan
+    churn_multiplier: 0.85    # prepaid buyers are more committed: churn at renewal x0.85
+
+promo:
+  first_month_discount: 0.20  # 20% off the FIRST charge, monthly plan only (prepaid is already discounted)
+  channels: [meta, tiktok, affiliate]   # channels whose landing offers carry the promo
+
+# -----------------------------------------------------------------------------
+# Acquisition channels
+#   spend:        cash marketing cost per month (Jan..Sep)
+#   expected_cpa: spend per NEW PAYING customer (approved + first charge captured)
+#   churn_multiplier: scales the tenure churn curve (1.00 = baseline)
+# -----------------------------------------------------------------------------
+channels:
+  meta:
+    paid: true                # paid media channel (included in paid-only CPA)
+    spend:        [420000, 440000, 460000, 480000, 500000, 480000, 460000, 470000, 480000]
+    expected_cpa: 320         # paid social, broad reach, mid-quality traffic
+    churn_multiplier: 1.10    # promo-driven, slightly worse retention
+  google:
+    paid: true                # paid media channel (included in paid-only CPA)
+    spend:        [280000, 290000, 300000, 310000, 320000, 310000, 300000, 305000, 310000]
+    expected_cpa: 285         # search intent; higher-quality, lower churn
+    churn_multiplier: 0.95
+  tiktok:
+    paid: true                # paid media channel (included in paid-only CPA)
+    spend:        [120000, 140000, 160000, 180000, 200000, 190000, 180000, 185000, 190000]
+    expected_cpa: 380         # younger, impulse-driven audience; costliest CPA
+    churn_multiplier: 1.30    # highest churn
+  affiliate:
+    paid: true                # paid media channel (included in paid-only CPA)
+    spend:        [100000, 105000, 110000, 115000, 120000, 120000, 115000, 115000, 120000]
+    expected_cpa: 250         # pay-per-acquisition bounty; spend = bounty x conversions
+    churn_multiplier: 1.05
+  organic_referral:
+    paid: false               # organic/referral: excluded from paid-only CPA
+    spend:        [25000, 27000, 29000, 31000, 33000, 34000, 35000, 36000, 37000]
+    expected_cpa: 60          # referral credits + SEO/content cost per organic customer
+    churn_multiplier: 0.75    # referred patients retain best
+
+# -----------------------------------------------------------------------------
+# Retention dynamics
+# -----------------------------------------------------------------------------
+retention:
+  # Probability an active customer voluntarily cancels at the END of tenure month t
+  # (i.e. does not continue into month t+1). Last value applies to all later months.
+  churn_by_tenure: [0.22, 0.15, 0.12, 0.10, 0.08, 0.06]
+  monthly_pause_rate: 0.04        # share of actives who pause a month (no charge, no shipment, no churn)
+  pause_duration_months: 1        # average pause length before auto-resume
+  reactivation_rate: 0.03         # monthly share of churned customers (churned <= window) who return
+  reactivation_window_months: 6   # churned customers older than this never reactivate
+  failed_payment_rate: 0.08       # share of RENEWAL charges that fail on first attempt
+  failed_payment_recovery: 0.60   # share of failed charges recovered by dunning within the month;
+                                  # unrecovered -> involuntary churn
+
+# -----------------------------------------------------------------------------
+# Medication (COGS) — the ONLY place drug cost lives
+# -----------------------------------------------------------------------------
+medication:
+  # Cost per 1-month supply at starting dose, by month (Jan..Sep).
+  # Rises Feb-May (supplier price increases / shortage), eases Jun,
+  # drops Jul when the new pharmacy contract takes effect.
+  cost_per_month_supply: [95, 105, 115, 125, 135, 128, 98, 98, 98]
+  # Dose-titration multiplier by tenure month (higher doses cost more).
+  # Last value applies to all later months.
+  dose_multiplier_by_tenure: [1.00, 1.00, 1.25, 1.25, 1.50, 1.60]
+
+# -----------------------------------------------------------------------------
+# Other variable costs (per unit as stated; medication is NOT included in any of these)
+# Shipments are monthly for both plans (cold chain + dose titration).
+# -----------------------------------------------------------------------------
+variable_costs:
+  pharmacy_dispensing_per_shipment: 15.00   # pharmacy fill/label/compounding fee, excl. drug
+  clinical_consult:
+    initial: 45.00                 # first async/sync clinician intake (per applicant reviewed)
+    follow_up: 20.00               # monthly check-in / refill authorization (tenure month 2+)
+    intake_decline_rate: 0.08      # applicants declined clinically: consult paid, no sale;
+                                   # their consult cost is allocated to approved customers
+  shipping_per_shipment: 12.00     # insulated overnight/2-day shipping
+  packaging_fulfillment_per_shipment: 8.00  # cold packs, box, pick/pack labor
+  payment_processing:
+    pct_of_charge: 0.029           # card processing percentage
+    fixed_per_charge: 0.30         # per successful charge
+
+# -----------------------------------------------------------------------------
+# Refunds & chargebacks
+# -----------------------------------------------------------------------------
+refunds:
+  first_order_rate: 0.05           # share of first charges with a refund
+  renewal_rate: 0.015              # share of renewal charges with a refund
+  avg_refund_share: 0.60           # average refund as share of the charge (partials common after shipping)
+  lag_months: 1                    # refund paid out ~1 month after the charge
+chargebacks:
+  first_order_rate: 0.008          # share of first charges disputed and lost
+  renewal_rate: 0.004              # share of renewal charges disputed and lost
+  fee_per_chargeback: 15.00        # processor dispute fee
+  lag_months: 2                    # chargeback debited ~2 months after the charge
+# Costs of goods already shipped are NOT recovered on refund or chargeback.
+
+# -----------------------------------------------------------------------------
+# Fixed operating expenses (per month, Jan..Sep) — not driven by volume
+# -----------------------------------------------------------------------------
+fixed_opex:
+  payroll:            [520000, 520000, 535000, 535000, 550000, 550000, 560000, 560000, 560000]  # salaries + benefits (non-clinical)
+  technology:         [ 85000,  85000,  88000,  88000,  90000,  90000,  92000,  92000,  92000]  # hosting, EHR, software licenses
+  legal_compliance:   [ 60000,  60000,  65000,  65000,  65000,  70000,  70000,  70000,  70000]  # regulatory, legal, insurance
+  rent_general_admin: [ 45000,  45000,  45000,  45000,  45000,  45000,  45000,  45000,  45000]  # office, G&A
+  # Fixed opex is assumed to be paid in the month incurred.
+
+# -----------------------------------------------------------------------------
+# Cash timing
+# -----------------------------------------------------------------------------
+cash:
+  opening_balance: 2500000         # cash on hand at 2026-01-01
+  days_per_month: 30               # simplification for day-based lags
+  card_payout_lag_days: 2          # processor settles T+2 -> last 2 days of each month's
+                                   # charges land next month (~2/30 of charges)
+  pharmacy_payment_terms_days: 30  # medication + dispensing invoiced per shipment, paid 30 days later
+  ad_spend_payment_lag_months: 1   # marketing invoices paid at the end of the following month
+  # Paid in month incurred: clinical consults, shipping, packaging, processing fees
+  # (netted from payouts), fixed opex. Refunds/chargebacks paid per their lags above.
+
+# -----------------------------------------------------------------------------
+# Simulation behavior (used by src/generate_data.py)
+# -----------------------------------------------------------------------------
+simulation:
+  new_customer_noise_sd: 0.08      # monthly volume per channel = spend / CPA x (1 + N(0, sd))
+  max_billing_day: 28              # signup/billing anchor day drawn from 1..28 (every month has it)
+  dunning_retry_days: [1, 3, 5]    # days after a failed renewal when the card is retried
+  refund_share_spread: 0.50        # refund share ~ U(avg x (1-spread), avg x (1+spread)), capped at 100%
+  refund_jitter_days: 10           # refund date = order date + lag +/- up to this many days
+  chargeback_jitter_days: 15       # chargeback date = order date + lag +/- up to this many days
+  refund_triggers_cancel: true     # customer who asks for a refund cancels before the next charge
+  chargeback_blocks_customer: true # chargeback -> account blocked (cancel), never reactivated
+  cancel_reasons:                  # mix of reasons for VOLUNTARY cancels (weights sum to 1)
+    price: 0.35
+    side_effects: 0.25
+    reached_goal: 0.20
+    other: 0.20
+  # Shipments after the period (e.g. Oct for an Aug prepaid order) use the last month's medication cost.
+
+# -----------------------------------------------------------------------------
+# LTV projection & CPA targets (used by src/ltv_projection.py)
+# -----------------------------------------------------------------------------
+ltv:
+  horizon_months: 12               # projection horizon for LTV and break-even CPA
+  discount_rate_monthly: 0.01      # ~12.7% annual; applied to month k as 1/(1+r)^k
+  projection_start_month: "2026-09" # cohort start month; later months use the last known med cost
+  target_ltv_to_cpa: 3.0           # target CPA = 12-month contribution LTV / 3
+  max_payback_months: 4            # max CPA = contribution earned within this many months
+  min_customers_for_fit: 200       # ignore retention points observed on fewer customers
+  sensitivity:
+    medication_uplift: 0.15        # "medication +15%" scenario
+    retention_drop_pp: 0.10        # "retention -10pp" scenario (months 1+; month 0 stays 100%)
+
+# -----------------------------------------------------------------------------
+# Unit-economics check settings
+# -----------------------------------------------------------------------------
+unit_check:
+  reference_month: "2026-01"       # medication cost month used for the one-customer check
+  payback_horizon_months: 24       # stop searching for payback after this many months
